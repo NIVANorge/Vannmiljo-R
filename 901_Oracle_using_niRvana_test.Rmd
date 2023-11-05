@@ -1,0 +1,145 @@
+---
+title: "020_Oracle_using_niRvana"
+author: "DHJ"
+date: "2023-10-26"
+output: 
+  html_document:
+    keep_md: true
+    toc: true  
+    toc_float: true
+params:
+  oracleuser: 
+    label: "NIVA initials (3 capital letters)"
+    value: "DHJ"
+    input: text
+  oraclepass: 
+    label: "Oracle password"
+    value: ""
+    input: password
+---
+
+
+```{r}
+
+library2 <- function(...) suppressPackageStartupMessages(library(...))
+
+library2(dbplyr)
+library2(dplyr)
+library2(lubridate)
+library2(ggplot2)
+library2(stringr)
+# devtools::install_github("NivaNorge/niRvana")
+devtools::install("../niRvana", upgrade = "never")
+library(niRvana)
+
+```
+
+
+## Set up Oracle connection   
+
+- If interactive usage (running chunk by chunk), you will be asked for user/password   
+- If you want to knit file, use "Knit with Parameters..." from the pull-down menu next to the Knit button  
+
+```{r}
+
+if (interactive()){
+  con <- DBI::dbConnect(odbc::odbc(),
+                      Driver = "/opt/conda/orahome/libsqora.so.12.1",
+                      DBQ = "dbora-niva-prod01.niva.corp:1555/NIVABPRD",
+                      UID = rstudioapi::showPrompt("Connect to Nivabasen", "Database username"),
+                      PWD = rstudioapi::askForPassword("Nivabasen password"))
+} else {
+  con <- DBI::dbConnect(odbc::odbc(),
+                        Driver = "/opt/conda/orahome/libsqora.so.12.1",
+                        DBQ = "dbora-niva-prod01.niva.corp:1555/NIVABPRD",
+                        UID = params$oracleuser,
+                        PWD = params$oraclepass)
+}
+
+
+# After this we should tell niRvana that it should ues an existing connection  
+#   options(use_existing_connection = TRUE)
+# For demonstration, we don't do tha now  
+
+```
+
+
+## Test niRvana  
+
+### Try default  
+
+Results i n th error `there is no package called ‘keyring’` 
+
+```{r}
+
+# Define sql sentence
+sql <- "select METHOD_ID, NAME, UNIT, BASIS_ID from NIVADATABASE.METHOD_DEFINITIONS where rownum < 5"
+
+# debugonce(get_nivabase_data)
+df_methods1 <- get_nivabase_data(sql)
+
+```
+
+### By setting use_existing_connection = TRUE  
+
+Should work 
+
+```{r}
+
+df_methods2 <- get_nivabase_data(sql, use_existing_connection = TRUE)
+
+```
+
+### By setting the option 'use_existing_connection' to TRUE   
+
+- The only alternative if we are going to use most functions in niRvana  
+
+```{r}
+
+options(use_existing_connection = TRUE)
+df_methods3 <- get_nivabase_data(sql)
+
+```
+
+## Bigger test  
+
+### Get data  
+```{r}
+
+# from ?get_biota_chemistry
+
+# Get a list of projects
+df_projects <- get_projects()   # we call it 'df_projects' (the default name)
+
+# Get a list of stations
+df1_stations <- get_stations_from_project("CEMP_Biota", ignore.case = FALSE)
+
+# Get specimens collected at these stations 
+
+# Speciemns for all years .- very slow on the hub (1-2 mins)
+# df2_specimens_allyrs <- get_specimens_from_stationdata(df1_stations, )
+
+df2_specimens <- get_specimens_from_stationdata(df1_stations, years = 2016)
+
+# Get data frame of chemical results (30 seconds or so)
+df_2016 <- get_biota_chemistry(
+  years = 2016,
+  specimendata = df2_specimens,
+  stationdata = df1_stations,
+  report_samples = TRUE)
+
+
+```
+### Test plot  
+
+```{r}
+
+ggplot(
+  df_2016 %>% filter(NAME %in% "PCB 52" & LATIN_NAME %in% "Mytilus edulis"),
+  aes(x = paste(STATION_CODE, STATION_NAME), y = VALUE, color = is.na(FLAG1))
+) + 
+  geom_point() +
+  theme(axis.text.x = element_text(hjust = 0, angle = -45))
+
+```
+
