@@ -21,6 +21,198 @@ sql_taxon <- paste(
 #
 #o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o
 
+
+make_sql_single_specimen <- function(i, data){
+  
+  df <- as.data.frame(data)
+  
+  original_options <- options(useFancyQuotes = FALSE)
+  txt <- paste0("insert into NIVADATABASE.BIOTA_SINGLE_SPECIMENS ",
+                "(DATE_CAUGHT, STATION_ID, TAXONOMY_CODE_ID, SPECIMEN_NO)\n",  # \n for line shift
+                "values (",
+                "TO_DATE(", sQuote(df[i, 'DATE_CAUGHT']), ", 'YYYY-MM-DD'), ",
+                df[i, 'STATION_ID'], ", ",
+                df[i, 'TAXONOMY_CODE_ID'], ", ",
+                df[i, 'SPECIMEN_NO'],
+                ")"
+  )
+  options(original_options)
+  txt
+}
+
+# make_sql_single_specimen(1, biota_single_specimens_eider)
+# make_sql_single_specimen(2, biota_single_specimens_eider)
+
+
+
+make_sql_sample <- function(i, data){
+  
+  df <- as.data.frame(data)
+  
+  original_options <- options(useFancyQuotes = FALSE)
+  txt <- paste0("insert into NIVADATABASE.BIOTA_SAMPLES ",
+                "(STATION_ID, TISSUE_ID, REPNO, TAXONOMY_CODE_ID, SAMPLE_DATE, SAMPLE_NO)\n",  # \n for line shift
+                "values (",
+                df[i, 'STATION_ID'], ", ",
+                df[i, 'TISSUE_ID'], ", ",
+                df[i, 'REPNO'], ", ",
+                df[i, 'TAXONOMY_CODE_ID'], ", ",
+                "TO_DATE(", sQuote(df[i, 'SAMPLE_DATE']), ", 'YYYY-MM-DD'), ",
+                df[i, 'SAMPLE_NO'],
+                ")"
+  )
+  options(original_options)
+  txt
+}
+
+
+make_sql_samples_specimens <- function(i, data){
+  
+  df <- as.data.frame(data)
+  
+  original_options <- options(useFancyQuotes = FALSE)
+  txt <- paste0("insert into NIVADATABASE.BIOTA_SAMPLES_SPECIMENS ",
+                "(SAMPLE_ID, SPECIMEN_ID)\n",  # \n for line shift
+                "values (",
+                df[i, 'SAMPLE_ID'], ", ",
+                df[i, 'SPECIMEN_ID'],
+                ")"
+  )
+  options(original_options)
+  txt
+}
+
+# Test
+# make_sql_samples_specimens(1, biota_sample_specimens_eider)
+
+
+#
+# BIOTA_CHEMISTRY_VALUES
+#
+
+# "VALUE_ID"              - Let the database decide
+# "SAMPLE_ID"             - From the database, after BIOTA_SAMPLES have been inserted
+# "METHOD_ID"             - Lookup based on NAME and UNIT
+# "VALUE"                 - From data
+# "FLAG1"                 - From data
+# "FLAG2"                 - NA
+# "ENTERED_BY"            - DHJ
+# "ENTERED_DATE"          - date, see above
+# "REMARK"                - NA
+# "DETECTION_LIMIT"       - NA
+# "UNCERTAINTY"           - NA
+# "QUANTIFICATION_LIMIT"  - NA
+# "APPROVED"              - NA?
+
+
+make_sql_chemistry_values <- function(i, data){
+  
+  df <- as.data.frame(data)
+  
+  original_options <- options(useFancyQuotes = FALSE)
+  
+  flag <- df[i, 'FLAG1']
+  txt <- paste0("insert into NIVADATABASE.BIOTA_CHEMISTRY_VALUES ",
+                "(SAMPLE_ID, METHOD_ID, VALUE, FLAG1, APPROVED)\n",  # \n for line shift
+                "values (",
+                df[i, 'SAMPLE_ID'], ", ",
+                df[i, 'METHOD_ID'], ", ",
+                round(df[i, 'VALUE'], 6), ", ",
+                ifelse(is.na(flag), "NULL", sQuote(flag)), ", ",
+                1,
+                ")"
+  )
+  options(original_options)
+  txt
+}
+# Test
+# make_sql_chemistry_values(1, biota_chemistry_values_eider)
+
+#
+# For "select all" - NOT FINISHED!
+#
+# make_sql_chemistry_values_intoall <- function(lines, data){
+#   
+#   df <- as.data.frame(data)
+#   data_section <- make_sql_chemistry_values_single <- function( data)
+#   
+#   original_options <- options(useFancyQuotes = FALSE)
+#   txt <- paste0("insert all\n",
+#                 data_section,
+#                 "select 1 from dual"
+#   )
+#   options(original_options)
+#   txt
+# }
+
+#
+# For "select all" - NOT FINISHED!
+#
+
+# make_sql_chemistry_values_single <- function(i, data){
+#   
+#   df <- as.data.frame(data)
+#   
+#   original_options <- options(useFancyQuotes = FALSE)
+#   
+#   flag <- round(df[i, 'FLAG1'], 6)
+#   txt <- paste0("    into NIVADATABASE.BIOTA_CHEMISTRY_VALUES ",
+#                 "    (SAMPLE_ID, METHOD_ID, VALUE, FLAG1,APPROVED)\n",  # \n for line shift
+#                 "    values (",
+#                 df[i, 'SAMPLE_ID'], ", ",
+#                 df[i, 'METHOD_ID'], ", ",
+#                 round(df[i, 'VALUE'], 6), ", ",
+#                 ifelse(is.na(flag), "NULL", sQuote(flag)),
+#                 1,
+#                 ")"
+#   )
+#   options(original_options)
+#   txt
+# }
+
+
+
+make_sql_methods <- function(i, data){
+  
+  df <- as.data.frame(data)
+  
+  original_options <- options(useFancyQuotes = FALSE)
+  
+  name <- df[i, 'NAME']
+  unit <- df[i, 'UNIT']
+  lab <- df[i, 'LABORATORY']
+  method_ref <- df[i, 'METHOD_REF']
+  matrix <- df[i, 'MATRIX']
+  cas <- df[i, 'CAS']
+  txt <- paste0(
+    "insert into NIVADATABASE.METHOD_DEFINITIONS ",
+    "(NAME, UNIT, LABORATORY, METHOD_REF, MATRIX, CAS, MATRIX_ID)\n",  # \n for line shift
+    "values (",
+    ifelse(is.na(name), "NULL", sQuote(name)), ", ",
+    ifelse(is.na(unit), "NULL", sQuote(unit)), ", ",
+    ifelse(is.na(lab), "NULL", sQuote(lab)), ", ",
+    ifelse(is.na(method_ref), "NULL", sQuote(method_ref)), ", ",
+    ifelse(is.na(matrix), "NULL", sQuote(matrix)), ", ",
+    ifelse(is.na(cas), "NULL", sQuote(cas)), ", ",
+    df[i, 'MATRIX_ID'],
+    ")"
+  )
+  options(original_options)
+  txt
+}
+
+# See script 75:
+# make_sql_methods(1, new_methods)
+
+
+#
+# Helper functions for making SQL parts
+#
+# Takes the unique values of a variable and puts them in a bracket (sql style)
+# 
+#
+
+
 # . Making SQLs - create SQLs 
 #
 # Based on 'make_sql_methods' in script 71..functions  
@@ -71,6 +263,121 @@ if (FALSE){
     descr = df_substances_sel[i,"Description"],
     cas = df_substances_sel[i, "CAS"])
 }
+
+
+
+make_sql_ids <- function(data, variable){
+  values <- data[[variable]] %>% unique()
+  if (class(data[[variable]]) == "character"){
+    original_options <- options(useFancyQuotes = FALSE)
+    values <- sQuote(values)
+    options(original_options)
+  }
+  paste0("(",
+         values %>% paste(collapse = ","),
+         ")")
+}
+
+# make_sql_ids(biota_samples, "STATION_ID")      
+# "(46980,47221,50478,67807,69711)"
+#
+# make_sql_ids(biota_chemistry_values, "FLAG1")
+# "('<','NA')"
+
+
+#
+# BIOTA_CHEMISTRY_VALUES
+#
+
+# "VALUE_ID"              - Let the database decide
+# "SAMPLE_ID"             - From the database, after BIOTA_SAMPLES have been inserted
+# "METHOD_ID"             - Lookup based on NAME and UNIT
+# "VALUE"                 - From data
+# "FLAG1"                 - From data
+# "FLAG2"                 - NA
+# "ENTERED_BY"            - DHJ
+# "ENTERED_DATE"          - date, see above
+# "REMARK"                - NA
+# "DETECTION_LIMIT"       - NA
+# "UNCERTAINTY"           - NA
+# "QUANTIFICATION_LIMIT"  - NA
+# "APPROVED"              - NA?
+
+# Table
+# WATER_CHEMISTRY_VALUES
+#
+# Columns
+# WATER_SAMPLE_ID
+# METHOD_ID
+# VALUE
+# FLAG1
+# DETECTION_LIMIT QUANTIFICATION_LIMIT
+# UNCERTAINTY
+
+
+make_sql_waterchemistry_values <- function(i, data){
+  
+  df <- as.data.frame(data)
+  
+  original_options <- options(useFancyQuotes = FALSE)
+  
+  
+  flag <- df[i, 'FLAG1']
+  txt <- paste0("insert into NIVADATABASE.WATER_CHEMISTRY_VALUES ",
+                "(WATER_SAMPLE_ID, METHOD_ID, VALUE, FLAG1, APPROVED)\n",  # \n for line shift
+                "values (",
+                df[i, 'WATER_SAMPLE_ID'], ", ",
+                df[i, 'METHOD_ID'], ", ",
+                round(df[i, 'VALUE'], 6), ", ",
+                ifelse(is.na(flag), "NULL", sQuote(flag)), ", ",
+                1,
+                ")"
+  )
+  options(original_options)
+  txt
+}
+# Test
+# make_sql_waterchemistry_values(1, biota_chemistry_values_eider)
+
+
+
+# Table
+# SEDIMENT_CHEMISTRY_VALUES
+#
+# Columns
+# SLICE_ID
+# METHOD_ID
+# MATRIX - e.g. NS
+# FRACTION_SIZE - typically empty for surface grab chemistry
+# VALUE
+# FLAG1
+# DETECTION_LIMIT 
+# QUANTIFICATION_LIMIT
+# UNCERTAINTY
+
+make_sql_sedimentchemistry_values <- function(i, data){
+  
+  df <- as.data.frame(data)
+  
+  original_options <- options(useFancyQuotes = FALSE)
+  
+  flag <- df[i, 'FLAG1']
+  txt <- paste0("insert into NIVADATABASE.SEDIMENT_CHEMISTRY_VALUES ",
+                "(SLICE_ID, METHOD_ID, MATRIX, VALUE, FLAG1, APPROVED)\n",  # \n for line shift
+                "values (",
+                df[i, 'SLICE_ID'], ", ",
+                df[i, 'METHOD_ID'], ", ",
+                sQuote(df[i, 'MATRIX']), ", ",
+                round(df[i, 'VALUE'], 6), ", ",
+                ifelse(is.na(flag), "NULL", sQuote(flag)), ", ",
+                1,
+                ")"
+  )
+  options(original_options)
+  txt
+}
+# Test
+# make_sql_sedimentchemistry_values(1, df_nilu_03_sed_02)
 
 
 
@@ -650,6 +957,139 @@ add_coordinates <- function(data){
     left_join(df_statid) %>%
     left_join(df_coord, by = c("GEOM_REF_ID" = "SAMPLE_POINT_ID"))
   
+}
+
+
+# Creates a one-frame lookup table 
+# Meant for only a single species input!
+latin_to_taxid <- function(latin_name){
+  df <- df_taxon %>% filter(LATIN_NAME %in% latin_name)
+  x <- df_taxoncodes %>% filter(NIVA_TAXON_ID %in% df$NIVA_TAXON_ID) %>% pull(TAXONOMY_CODE_ID)
+  tibble(LATIN_NAME = latin_name, TAXONOMY_CODE_ID = x)
+}
+
+# Creates a one-frame lookup table 
+# Meant for only a single-number input!
+taxid_to_latin <- function(taxonomy_code_id){
+  df <- df_taxoncodes %>% filter(TAXONOMY_CODE_ID %in% taxonomy_code_id)
+  x <- df_taxon %>% filter(NIVA_TAXON_ID %in% df$NIVA_TAXON_ID) %>% pull(LATIN_NAME)
+  tibble(TAXONOMY_CODE_ID = taxonomy_code_id, LATIN_NAME = x)
+}
+
+# Tests
+# latin_to_taxid("Gadus morhua")
+# c("Gadus morhua", "Clupea harengus") %>% map_df(latin_to_taxid)
+# taxid_to_latin(8850)
+# c(8849,8850) %>% map_df(taxid_to_latin)
+
+
+#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o
+#
+# Functions for getting lookup data ----
+#
+#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o
+
+# Get rows from METHOD_DEFINITIONS (including 'METHOD_ID') fitting NAME, UNIT, LABORATORY, and MATRIX
+# - NAME, UNIT are from a data frame
+# - LABORATORY, MATRIX must be the same for all (if they are in the data frame, they will be ignored)
+
+get_lookup_methodid <- function(df_parameters, lab, matrix){
+  # First get all rows fitting NAME
+  result_allunits <- get_nivabase_selection(
+    "NAME, UNIT, LABORATORY, METHOD_ID, MATRIX",
+    "METHOD_DEFINITIONS",
+    "NAME",
+    df_parameters$NAME, values_are_text = TRUE, 
+    extra_sql = paste0("AND LABORATORY = ", sQuote(lab), "AND MATRIX = ", sQuote(matrix))
+  )
+  # result_allunits
+  # Then remove rows not fitting UNIT (for each NAME)
+  input_data <- df_parameters[c("NAME", "UNIT")]
+  # Replace NA with an empty string ("")
+  result_allunits$UNIT[is.na(result_allunits$UNIT)] <- ""
+  input_data$UNIT[is.na(input_data$UNIT)] <- ""
+  result <- result_allunits %>% 
+    semi_join(input_data, by = join_by(NAME, UNIT))
+  result
+}
+
+if (FALSE){
+  # TEST
+  df_params <- structure(list(
+    NAME = c("HCBD", "PeCB", "HCB"), 
+    UNIT = c("ng/g w.w.", "ng/g w.w.", "ng/g w.w.")
+  ), row.names = c(NA, -3L), class = c("data.frame"))
+  debugonce(get_lookup_methodid)
+  test <- get_lookup_methodid(df_params, lab = 'NILU', matrix = 'BIOTA')
+}
+
+#
+# Search for a given NAME, LABORATORY, MATRIX (returns all values regardless of UNIT)
+# - if exact = TRUE, NAME can be several values  
+# - if exact = FALSE, NAME can be only one value (searches within string, but is case sensitive)  
+# - one or both of LABORATORY, MATRIX can be NA; if so, they are ignored  
+# - possible improvement: case-insensitive search
+#
+search_lookup_methodid <- function(names, lab, matrix, exact = TRUE){
+  extra_sql <- ""
+  if (!is.na(lab)){
+    extra_sql <- paste(extra_sql, "AND LABORATORY = ", sQuote(lab))
+  }
+  if (!is.na(matrix)){
+    extra_sql <- paste(extra_sql, "AND MATRIX = ", sQuote(matrix))
+  }
+  if (exact){
+    result_allunits <- get_nivabase_selection(
+      "NAME, UNIT, LABORATORY, METHOD_ID, MATRIX",
+      "METHOD_DEFINITIONS",
+      "NAME",
+      names, values_are_text = TRUE, 
+      extra_sql = extra_sql
+    )
+  } else {
+    if (length(names) > 1)
+      stop("When exact = FALSE, 'names' must only be a single word/string")
+    sql <- paste(
+      "SELECT NAME, UNIT, LABORATORY, METHOD_ID, MATRIX",
+      "FROM NIVADATABASE.METHOD_DEFINITIONS",
+      "WHERE NAME like",
+      sQuote(paste0("%", names, "%"))
+    )
+    sql <- paste(sql, extra_sql)
+    result_allunits <- get_nivabase_data(sql)
+  }
+  result_allunits
+}
+
+if (FALSE){
+  search_lookup_methodid("d13CVPDP", lab = 'IFE', matrix = 'BIOTA')
+  search_lookup_methodid("d13C", lab = 'IFE', matrix = 'BIOTA', exact = FALSE)
+  search_lookup_methodid("TOC", lab = 'NIVA', matrix = 'SEDIMENT', exact = FALSE)
+  search_lookup_methodid("TOC", lab = NA, matrix = 'SEDIMENT', exact = FALSE)
+  search_lookup_methodid("TOC", lab = 'NIVA', matrix = NA, exact = FALSE)
+  search_lookup_methodid("TOC", lab = NA, matrix = NA, exact = FALSE)
+  
+  search_lookup_methodid("d15N", lab = 'IFE', matrix = 'BIOTA', exact = FALSE)
+  test <- search_lookup_methodid("TOC", lab = NA, matrix = NA, exact = FALSE)
+}
+
+get_species_from_id <- function(taxoncode_id){
+  taxoncode_id <- taxoncode_id[!is.na(taxoncode_id)]
+  taxoncode_id <- unique(taxoncode_id)
+  if (length(taxoncode_id) > 0) {
+    result <- get_nivabase_data(paste("select a.TAXONOMY_CODE_ID, b.LATIN_NAME", 
+                                      "from NIVADATABASE.TAXONOMY_CODES a LEFT JOIN NIVADATABASE.TAXONOMY b ON a.NIVA_TAXON_ID = b.NIVA_TAXON_ID", 
+                                      "where TAXONOMY_CODE_ID in", "(", paste(taxoncode_id, 
+                                                                              collapse = ","), ");"))
+  } else {
+    result <- NULL
+  }
+  result
+}
+
+if (FALSE){
+  # debugonce(get_species_from_id)
+  get_species_from_id(8927)
 }
 
 
