@@ -1004,22 +1004,26 @@ taxid_to_latin <- function(taxonomy_code_id){
 # - LABORATORY, MATRIX must be the same for all (if they are in the data frame, they will be ignored)
 
 get_lookup_methodid <- function(df_parameters, lab, matrix){
+  # A fix to handle apostrophes in NAME - excape it using an extra apastrophe 
+  df_parameters$NAME_search <- sub("'", "''", df_parameters$NAME)
   # First get all rows fitting NAME
   result_allunits <- get_nivabase_selection(
     "NAME, UNIT, LABORATORY, METHOD_ID, MATRIX",
     "METHOD_DEFINITIONS",
     "NAME",
-    df_parameters$NAME, values_are_text = TRUE, 
+    df_parameters$NAME_search, values_are_text = TRUE, 
     extra_sql = paste0("AND LABORATORY = ", sQuote(lab), " AND MATRIX = ", sQuote(matrix))
   )
   # result_allunits
   # Then remove rows not fitting UNIT (for each NAME)
-  input_data <- df_parameters[c("NAME", "UNIT")]
+  df_for_unit_check <- df_parameters[c("NAME", "UNIT")]
   # Replace NA with an empty string ("")
-  result_allunits$UNIT[is.na(result_allunits$UNIT)] <- ""
-  input_data$UNIT[is.na(input_data$UNIT)] <- ""
+  sel <- is.na(result_allunits$UNIT)
+  result_allunits$UNIT[sel] <- ""
+  sel <- is.na(df_for_unit_check$UNIT)
+  df_for_unit_check$UNIT[sel] <- ""
   result <- result_allunits %>% 
-    semi_join(input_data, by = join_by(NAME, UNIT))
+    semi_join(df_for_unit_check, by = join_by(NAME, UNIT))
   result
 }
 
