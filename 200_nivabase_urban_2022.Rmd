@@ -1,0 +1,231 @@
+---
+title: "200_nivabase_urban_2022"
+author: "DHJ"
+date: "2023-11-05"
+output: html_document
+---
+
+## Read data from Nivabase   
+- Script 200_Nivabase_[program]_[year]     
+- functions used   
+    - get_stations_from_project_id  
+    - get_specimens_from_stationdata   
+    - get_biota_chemistry  
+    - get_water_chemistry_from_stations  
+    - get_sediment_chemistry_from_stations  
+    
+## 1. Setup  
+
+### For filenames  
+```{r}
+
+program_year <- "Urban_2022"
+sampling_year <- 2022
+
+```
+
+### Labware data  
+
+```{r}
+
+# dat_lab <- readRDS("Data/100_dat_lab_Milfersk_2022_2023-06-22.rds")
+
+```
+
+
+### Packages and functions  
+```{r}
+
+library_q <- function(...) suppressPackageStartupMessages(library(...))
+
+devtools::install("../niRvana", upgrade = "never", quiet = TRUE)
+library(niRvana)
+library_q(dplyr)
+library_q(purrr)
+library_q(lubridate)
+library_q(readxl)
+library_q(ggplot2)
+library_q(tidyr)
+library_q(knitr)     # for kable
+# library(fuzzyjoin)   # regex_full_join
+
+source("010_functions.R")
+
+knitr::opts_chunk$set(results = 'hold')
+
+```
+
+
+### Set up connection to Nivabasen on Oracle   
+
+```{r}
+
+con <- DBI::dbConnect(odbc::odbc(),
+                      Driver = "/opt/conda/orahome/libsqora.so.12.1",
+                      DBQ = "dbora-niva-prod01.niva.corp:1555/NIVABPRD",
+                      UID = rstudioapi::showPrompt("Connect to Nivabasen", "Database username"),
+                      PWD = rstudioapi::askForPassword("Nivabasen password"))
+
+
+# Tell niRvana that it should use this connection  
+options(use_existing_connection = TRUE)
+
+```
+
+
+## 2.  Check existing NIVAbasen data    
+
+```{r}
+
+df_projects <- get_projects()   
+
+# df_stations <- get_stations_from_project("MILFERSK", exact = FALSE)
+df_stations <- get_stations_from_project("urban", exact = FALSE)
+df_stations <- get_stations_from_project("Urban fjord", exact = TRUE)
+
+nrow(df_stations)
+
+```
+
+#### Get all data    
+
+* NOTE: No water - as stations haven't been defined for the water samples (see script 100)   
+
+```{r}
+
+# 
+## Biota samples
+#
+
+df_specimens <- get_specimens_from_stationdata(df_stations, years = sampling_year)
+message("No. of specimens, biota: ", nrow(df_specimens))
+dat_nb_biota <- get_biota_chemistry(sampling_year, df_specimens, df_stations, report_samples = TRUE)
+
+dat_nb_biota <- dat_nb_biota %>%
+  mutate(Year = year(SAMPLE_DATE))
+
+# 421  
+
+#
+## Water samples  
+#
+
+df_samples_water <- get_nivabase_selection(
+  "*",
+  "WATER_SAMPLES",
+  "STATION_ID",
+  df_stations$STATION_ID
+)
+message("No. of samples, water: ", nrow(df_samples_water))
+
+# Adds "SAMPLE_TYPE", "SAMPLE_NUMBER", "DESCRIPTION" and "n_labware" from Labware
+
+# debugonce(get_water_chemistry_from_stations)
+dat_nb_water <- get_water_chemistry_from_stations(unique(df_samples_water$STATION_ID), sampling_year)
+message("No. of measurements, water: ", nrow(dat_nb_water))
+
+df_samples_sediment <- get_nivabase_selection(
+  "*",
+  "SEDIMENT_SAMPLES",
+  "STATION_ID",
+  df_stations$STATION_ID
+)
+message("No. of samples, sediment: ", nrow(df_samples_sediment))
+
+dat_nb_sediment <- get_sediment_chemistry_from_stations(df_stations$STATION_ID, years = sampling_year)
+
+dat_nb_sediment_methods <- get_chemistry_methods(method_id = unique(dat_nb_sediment$METHOD_ID))
+
+dat_nb_sediment <- dat_nb_sediment %>%
+  left_join(dat_nb_sediment_methods, by = "METHOD_ID") %>%
+  mutate(Year = year(SAMPLE_DATE)) 
+
+```
+
+### Check biota data  
+
+#### Number of individuals per station  
+```{r}
+
+dat_nb_biota %>%
+  distinct(LATIN_NAME, STATION_CODE, SAMPLE_NO) %>%
+  count(LATIN_NAME, STATION_CODE)
+
+```
+
+#### Number of measurements per species    
+```{r}
+
+dat_nb_biota %>%
+  distinct(NAME, LATIN_NAME, SAMPLE_NO) %>%
+  count(NAME, LATIN_NAME, name = "number_ind") %>%
+  pivot_wider(names_from = LATIN_NAME, values_from = number_ind)
+
+```
+
+## 3. Seal samples  
+
+* Special for this year: used old seal samples    
+
+### Check LIMS  
+
+```{r}
+
+df_samples_seal <- get_nivabase_data(paste(
+  "select * from NIVADATABASE.LABWARE_CHECK_SAMPLE",
+  "where PROSJEKT like '%urban%'",
+  "and SPECIES = 'Phoca vitulina'"))
+
+# Tissues
+xtabs(~TISSUE, df_samples_seal)
+
+# Dates
+xtabs(~SAMPLED_DATE, df_samples_seal)
+xtabs(~RECD_DATE, df_samples_seal)
+
+# Tissues
+xtabs(~AQUAMONITOR_CODE, df_samples_seal)
+
+```
+
+### In Nivabasen  
+
+```{r}
+
+# Get all UB stations where STATION_CODE contains 'Sel' 
+df_stations_seal <- df_stations %>%
+  filter(grepl("Sel", STATION_CODE))
+
+# Get specimens from 2021 on these stations
+df_specimens <- get_specimens_from_stationdata(df_stations_seal, years = 2021)
+message("No. of specimens, biota: ", nrow(df_specimens))
+dat_nb_biota <- get_biota_chemistry(2021, df_specimens, df_stations_seal, 
+                                    report_samples = TRUE, months_second_year = 0)
+
+dat_nb_biota <- dat_nb_biota %>%
+  mutate(Year = year(SAMPLE_DATE))
+
+
+```
+
+
+### Check biota data  
+
+#### Number of individuals per station  
+```{r}
+
+dat_nb_biota %>%
+  distinct(LATIN_NAME, STATION_CODE, SAMPLE_NO) %>%
+  count(LATIN_NAME, STATION_CODE)
+
+```
+
+#### Number of measurements per species    
+```{r}
+
+dat_nb_biota %>%
+  distinct(NAME, LATIN_NAME, SAMPLE_NO) %>%
+  count(NAME, LATIN_NAME, name = "number_ind") %>%
+  pivot_wider(names_from = LATIN_NAME, values_from = number_ind)
+
+```
