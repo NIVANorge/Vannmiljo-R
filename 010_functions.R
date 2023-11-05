@@ -3,6 +3,16 @@
 
 library(dplyr)
 
+#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o
+#
+# Setting options
+#
+# Many of the functions won't work unless this functtion is set
+#
+#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o
+
+old_options <- options(useFancyQuotes = FALSE)
+
 
 #o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o
 #
@@ -1000,7 +1010,7 @@ get_lookup_methodid <- function(df_parameters, lab, matrix){
     "METHOD_DEFINITIONS",
     "NAME",
     df_parameters$NAME, values_are_text = TRUE, 
-    extra_sql = paste0("AND LABORATORY = ", sQuote(lab), "AND MATRIX = ", sQuote(matrix))
+    extra_sql = paste0("AND LABORATORY = ", sQuote(lab), " AND MATRIX = ", sQuote(matrix))
   )
   # result_allunits
   # Then remove rows not fitting UNIT (for each NAME)
